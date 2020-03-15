@@ -53,7 +53,7 @@ typedef struct
 	uint32_t reserve : 21;
 } can_std_id_t;
 
-typedef __packed struct
+typedef struct __packed 
 {
 	uint32_t hardwareversion;
 	uint32_t firmwareversion;
