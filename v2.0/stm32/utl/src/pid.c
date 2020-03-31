@@ -26,6 +26,7 @@ float pid_regulator(float error, pid_t *pid)
 	if (ki == 0)
 	{
 		pid->error_integral = 0;
+		i_term = 0;
 	}
 	else
 	{
@@ -33,22 +34,20 @@ float pid_regulator(float error, pid_t *pid)
 
 		if (i_term > pid->params->limit_integral)
 		{
-			pid->error_integral = pid->params->limit_integral;
+			i_term = pid->params->limit_integral;
 		}
 		else if (i_term < -pid->params->limit_integral)
 		{
-			pid->error_integral = -pid->params->limit_integral;
+			i_term = -pid->params->limit_integral;
 		}
-		else
-		{
-			pid->error_integral = i_term;
-		}
+
+		pid->error_integral = i_term;
 	}
 
 	d_term = kd * (error - pid->error_pre) / PID_CTRL_DT;
 	pid->error_pre = error;
 
-	output = p_term + pid->error_integral + d_term;
+	output = (p_term + i_term + d_term) * pid->params->factor;
 
 	if (output > pid->params->limit_output)
 	{

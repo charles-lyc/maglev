@@ -30,14 +30,37 @@
 #include <string.h>
 #include "utils_ex.h"
 #include "pid.h"
+#include "lpf_2p.h"
 
-volatile uint16_t ADC_Value[3];
-volatile int32_t Hall_Value[3];
-int16_t ADC_Offset[3] = {3072, 3062, 3400};
-pid_t PID_Var[2];
-pid_param_t PID_Param[2];
+enum
+{
+	LED_STARTUP = 0,
+	LED_IDLE,
+	LED_RUN,
+	LED_ERROR,
+	LED_TEST,
+} LED_Status;
+#define I2C_DEV_ADDR (0x58 << 1)
+#define I2C_DEV_ID (0x10)
+#define AVG_WIN_SZ 256
+
+volatile uint16_t ADC_Raw[3];
+int32_t ADC_RawAvg[2];
+int32_t ADC_Offset[3] = {3160, 3000, 3400};
+float Hall_Pos[3], Hall_Pos_Last[3];
+float Hall_Pos_lpf[2];
+float Hall_Speed_lpf[2];
+float TargetSpeed[2];
+lpf_2p_t lpf2p_pos[2], lpf2p_speed[2];
+int32_t avg_pos[2][AVG_WIN_SZ];
+int32_t avg_indx[2];
+pid_t PID_Pos[2];
+pid_t PID_Speed[2];
+pid_param_t PID_Param_Pos[2],PID_Param_Speed[2];
 uint8_t LED_Brightness[16];
-float LPF_Factor;
+ADC_HandleTypeDef hadc1;
+static uint32_t CtrlTick;
+static uint32_t BackgroundTick;
 const uint8_t LED_AddrMap[16] = {
 	8 + 7,
 	8 + 6,
@@ -56,22 +79,13 @@ const uint8_t LED_AddrMap[16] = {
 	1,
 	0,
 };
-enum
-{
-	LED_STARTUP = 0,
-	LED_IDLE,
-	LED_RUN,
-	LED_ERROR,
-	LED_TEST,
-} LED_Status;
-ADC_HandleTypeDef hadc1;
-#define I2C_DEV_ADDR (0x58 << 1)
-#define I2C_DEV_ID (0x10)
+
 inline void mag_set_pwm(int32_t pwm_a, int32_t pwm_b);
 int8_t mag_idle_detect(void);
 void mag_drv_set(bool mode);
 void mag_hall_calibrate(void);
-void mag_process(void);
+void mag_crtl_speed(void);
+void mag_crtl_pos(void);
 void led_process(void);
 void mag_led_reflesh(void);
 
@@ -145,9 +159,9 @@ void mag_drv_set(bool mode)
 // so the threthhold should be larger a little bit.
 int8_t mag_idle_detect(void)
 {
-	if (Hall_Value[2] < -200)
+	if (Hall_Pos_lpf[1] < -200)
 		return -1;
-	else if (Hall_Value[2] > 200)
+	else if (Hall_Pos_lpf[1] > 100)
 		return 1;
 
 	return 0;
@@ -191,73 +205,56 @@ void mag_set_pwm(int32_t pwm_a, int32_t pwm_b)
 	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, ccr2);
 }
 
-// 10K
+// 1K (Flat Response 23kHz)
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
-	int32_t hall_value;
-	static uint32_t Tick;
+	float Hall_Pos_lpf2p_Temp[2];
 
-	Tick++;
+	CtrlTick++;
 
-	for (size_t i = 0; i < 3; i++)
+	for (size_t i = 0; i < 2; i++)
 	{
-		hall_value = ADC_Value[i] - ADC_Offset[i];
-		UTILS_LP_FAST(Hall_Value[i], hall_value, LPF_Factor);
+		// pos lpf
+		// UTILS_LP_FAST(Hall_Pos_lpf[i], Hall_Pos[i], 0.1);
+		// Hall_Pos_lpf2p_Temp[i] = lpf2_apply(&lpf2p_pos[i], Hall_Pos[i]);
+
+		// pos average
+		avg_pos[i][avg_indx[i]++] = ADC_Raw[i];
+		avg_indx[i] %= AVG_WIN_SZ;
+		int32_t temp = 0;
+		for (size_t j = 0; j < AVG_WIN_SZ; j++)
+			temp += avg_pos[i][j];
+		ADC_RawAvg[i] = temp / AVG_WIN_SZ;
+		
+		// assemble problem
+		if(i==0)		
+			Hall_Pos[i] = -((int32_t)ADC_RawAvg[i] - ADC_Offset[i]);
+		else
+			Hall_Pos[i] = (int32_t)ADC_RawAvg[i] - ADC_Offset[i];
+
+		// UTILS_LP_FAST(Hall_Speed_lpf[i], Hall_Pos_lpf2p_Temp[i] - Hall_Pos_lpf[i], 0.01);
+		Hall_Speed_lpf[i] = lpf2_apply(&lpf2p_speed[i], Hall_Pos[i] - Hall_Pos_Last[i]);
+		Hall_Pos_Last[i] = Hall_Pos[i];
 	}
 
-	if (Tick % 4 == 0)
+	if (System_Status == MODE_RUN)
 	{
-		if (System_Status == MODE_RUN)
-		{
-			mag_process();
-		}
-	}
-	if (Tick % 10 == 0)
-	{
-		led_process();
-	}
-	if (Tick % 1000 == 0)
-	{
-		if (System_Status == MODE_RUN || System_Status == MODE_IDLE)
-		{
-			int8_t detect;
-			
-			detect = mag_idle_detect();
-			//detect  = -1;
-			if (detect  == 0)
-			{
-				mag_drv_set(false);
-				System_Status = MODE_IDLE;
-				LED_Status = LED_IDLE;
-			}
-			else if (detect == 1)
-			{
-				mag_drv_set(false);
-				System_Status = MODE_IDLE;
-				LED_Status = LED_ERROR;
-			}
-			else if (detect == -1)
-			{
-				mag_drv_set(true);
-				System_Status = MODE_RUN;
-				LED_Status = LED_RUN;
-			}
-		}
-	}
+		mag_crtl_speed();
+	}	
 }
 
 void mag_position_calibrate(void)
 {
 	int32_t offset_sum;
 
-	HAL_Delay(1000);
+	HAL_Delay(500);
 
 	for (size_t i = 0; i < 2; i++)
 	{
 		offset_sum = 0;
 		for (size_t j = 0; j < 32; j++)
 		{
-			offset_sum += ADC_Value[i];
+			offset_sum += ADC_Raw[i];
 			HAL_Delay(1);
 		}
 		ADC_Offset[i] = utils_round_div(offset_sum, 32);
@@ -284,17 +281,30 @@ bool mag_btn_even(void)
 	return false;
 }
 
-void mag_process(void)
+void mag_crtl_pos(void)
 {
-	int32_t va, vb;
-	int32_t error;
+	float error;
 
-	error = 0 - Hall_Value[0];
-	va = pid_regulator(error, &PID_Var[0]);
-	error = 0 - Hall_Value[1];
-	vb = pid_regulator(error, &PID_Var[1]);
+	for (size_t i = 0; i < 2; i++)
+	{
+		error = 0 - Hall_Pos[i];
+		TargetSpeed[i] = pid_regulator(error, &PID_Pos[i]);
+	}
+}
 
-	mag_set_pwm(-vb, -va);
+void mag_crtl_speed(void)
+{
+	float v_set[2];
+	float error;
+
+	for (size_t i = 0; i < 2; i++)
+	{
+		error = TargetSpeed[i] - Hall_Speed_lpf[i];
+		v_set[i] = pid_regulator(error, &PID_Speed[i]);
+	}
+
+	mag_set_pwm(-v_set[1], v_set[0]);
+	// mag_set_pwm(-0, v_set[0]);
 }
 
 // 1khz
@@ -328,39 +338,39 @@ void led_process(void)
 		}
 		break;
 	}
-	{
-		static uint8_t LED_Head = 0;
-		static uint8_t LED_Origin = 0;
-		static bool LED_Invert = false;
-		static bool LED_Carry = false;
-
-		if (Tick % 100 == 0)
 		{
-			LED_Head++;
-			if (LED_Head > 15)
-				LED_Head = 0;
+			static uint8_t LED_Head = 0;
+			static uint8_t LED_Origin = 0;
+			static bool LED_Invert = false;
+			static bool LED_Carry = false;
 
-			if (LED_Head == LED_Origin && LED_Carry)
+			if (Tick % 100 == 0)
 			{
-				LED_Carry = false;
-			}
-			else if (LED_Head == LED_Origin && LED_Invert)
-			{
-				LED_Origin++;
-				if (LED_Origin > 15)
-					LED_Origin = 0;
-				LED_Carry = true;
-				LED_Invert = false;
-			}
-			else if (LED_Head == LED_Origin && !LED_Invert)
-			{
-				LED_Invert = true;
-			}
+				LED_Head++;
+				if (LED_Head > 15)
+					LED_Head = 0;
 
-			LED_Brightness[LED_Head] = LED_Invert ? 0 : 5;
+				if (LED_Head == LED_Origin && LED_Carry)
+				{
+					LED_Carry = false;
+				}
+				else if (LED_Head == LED_Origin && LED_Invert)
+				{
+					LED_Origin++;
+					if (LED_Origin > 15)
+						LED_Origin = 0;
+					LED_Carry = true;
+					LED_Invert = false;
+				}
+				else if (LED_Head == LED_Origin && !LED_Invert)
+				{
+					LED_Invert = true;
+				}
+
+				LED_Brightness[LED_Head] = LED_Invert ? 0 : 5;
+			}
+			break;
 		}
-		break;
-	}
 	case LED_IDLE:
 		if (Tick % 100 == 0)
 		{
@@ -478,26 +488,51 @@ int main(void)
 	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
 
-	__HAL_TIM_SET_AUTORELOAD(&htim1, 100 - 1);
+	__HAL_TIM_SET_AUTORELOAD(&htim1, 200 - 1);
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 1);
 	HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_4);
-	HAL_ADC_Start_DMA(&hadc, (uint32_t *)ADC_Value, 3);
+	HAL_ADC_Start_DMA(&hadc, (uint32_t *)ADC_Raw, 3);
 	mag_drv_set(false);
 
 	System_Status = MODE_CALIBRATE;
-	PID_Param[0].kp = 1.5;
-	PID_Param[0].ki = 0.005;
-	PID_Param[0].kd = 0.002;
-	PID_Param[0].limit_integral = 15;
-	PID_Param[0].limit_output = 1000;
-	PID_Param[1].kp = 1.5;
-	PID_Param[1].ki = 0.01;
-	PID_Param[1].kd = 0.002;
-	PID_Param[1].limit_integral = 15;
-	PID_Param[1].limit_output = 1000;
-	pid_init(&PID_Var[0], &PID_Param[0]);
-	pid_init(&PID_Var[1], &PID_Param[1]);
-	LPF_Factor = 0.1f;
+
+	PID_Param_Speed[0].kp = 4;
+	PID_Param_Speed[0].ki = 0;
+	PID_Param_Speed[0].kd = 0.01;
+	PID_Param_Speed[0].limit_integral = 1;
+	PID_Param_Speed[0].factor = 100;
+	PID_Param_Speed[0].limit_output = 700;
+	pid_init(&PID_Speed[0], &PID_Param_Speed[0]);
+
+	PID_Param_Speed[1].kp = 4;
+	PID_Param_Speed[1].ki = 0;
+	PID_Param_Speed[1].kd = 0.01;
+	PID_Param_Speed[1].limit_integral = 1;
+	PID_Param_Speed[1].factor = 100;
+	PID_Param_Speed[1].limit_output = 700;
+	pid_init(&PID_Speed[1], &PID_Param_Speed[1]);
+
+	PID_Param_Pos[0].kp = 0;
+	PID_Param_Pos[0].ki = 0;
+	PID_Param_Pos[0].kd = 0;
+	PID_Param_Pos[0].limit_integral = 1;
+	PID_Param_Pos[0].factor = 0.001;
+	PID_Param_Pos[0].limit_output = 1;
+	pid_init(&PID_Pos[0], &PID_Param_Pos[0]);
+	
+	PID_Param_Pos[1].kp = 0;
+	PID_Param_Pos[1].ki = 0;
+	PID_Param_Pos[1].kd = 0;
+	PID_Param_Pos[1].limit_integral = 1;
+	PID_Param_Pos[1].factor = 0.001;
+	PID_Param_Pos[1].limit_output = 1;
+	pid_init(&PID_Pos[1], &PID_Param_Pos[1]);
+
+	lpf2_set_cutoff_frequency(&lpf2p_pos[0], 1000, 80);
+	lpf2_set_cutoff_frequency(&lpf2p_pos[1], 1000, 80);
+	lpf2_set_cutoff_frequency(&lpf2p_speed[0], 5000, 100);
+	lpf2_set_cutoff_frequency(&lpf2p_speed[1], 5000, 100);
+
 	System_Status = MODE_STARTUP;
 
 	uint8_t i2c_buffer_tx[5], i2c_buffer_rx[5];
@@ -519,7 +554,7 @@ int main(void)
 	// P0: push pull; max current: Imax x 1/4
 	i2c_buffer_tx[0] = (0x01 << 4) | (0x03);
 	bsp_aw9523b_reg_write(0x11, i2c_buffer_tx, 1);
-
+	
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
@@ -529,29 +564,66 @@ int main(void)
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
-		switch(System_Status)
+		switch (System_Status)
 		{
 		case MODE_STARTUP:
-			LED_Status=LED_STARTUP;
-			System_Status = MODE_IDLE;
+			LED_Status = LED_STARTUP;
+			System_Status = MODE_RUN;
+			mag_drv_set(true);
 			break;
 		default:
 			break;
 		}
-		static uint32_t Tick = 0;
-		if(Tick + 10 < HAL_GetTick())
-		{
-			Tick = HAL_GetTick();
-			mag_led_reflesh();
 
-			if (mag_btn_even())
-			{
-				System_Status = MODE_CALIBRATE;
-				mag_position_calibrate();
-				// save parameter
-				System_Status = MODE_IDLE;
-			}
+		// 10 ms tasks
+		if (HAL_GetTick() > BackgroundTick + 10)
+		{
+			BackgroundTick = HAL_GetTick();
+			mag_crtl_pos();
+
+			// 	led_process();
+			// 	mag_led_reflesh();
+			// 	if (mag_btn_even())
+			// 	{
+			// 		System_Status = MODE_CALIBRATE;
+			// 	}
+			// 	if (System_Status == MODE_CALIBRATE)
+			// 	{
+			// 		mag_position_calibrate();
+			// 		// save parameter
+			// 		System_Status = MODE_IDLE;
+			// 	}
+			// }
+
+			// 	if (System_Status == MODE_RUN || System_Status == MODE_IDLE)
+			// 	{
+			// 		int8_t detect;
+
+			// 		detect = mag_idle_detect();
+			// 		detect = -1;
+
+			// 		if (detect == 0)
+			// 		{
+			// 			mag_drv_set(false);
+			// 			System_Status = MODE_IDLE;
+			// 			LED_Status = LED_IDLE;
+			// 		}
+			// 		else if (detect == 1)
+			// 		{
+			// 			mag_drv_set(false);
+			// 			System_Status = MODE_IDLE;
+			// 			LED_Status = LED_ERROR;
+			// 		}
+			// 		else if (detect == -1)
+			// 		{
+			// 			mag_drv_set(true);
+			// 			System_Status = MODE_RUN;
+			// 			// LED_Status = LED_RUN;
+			// 			LED_Status = LED_IDLE;
+			// 		}
+			// 	}
 		}
+
 	}
 	/* USER CODE END 3 */
 }
@@ -732,7 +804,7 @@ static void MX_TIM1_Init(void)
 	htim1.Instance = TIM1;
 	htim1.Init.Prescaler = 48 - 1;
 	htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-	htim1.Init.Period = 1000 - 1;
+	htim1.Init.Period = 100 - 1;
 	htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
 	htim1.Init.RepetitionCounter = 0;
 	htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;

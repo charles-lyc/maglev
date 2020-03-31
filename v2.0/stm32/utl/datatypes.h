@@ -98,6 +98,8 @@ typedef struct
 
 	float limit_integral;
 	float limit_output;
+
+	float factor;	// in case of too large/small
 } pid_param_t;
 
 typedef struct

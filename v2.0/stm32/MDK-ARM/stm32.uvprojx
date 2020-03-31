@@ -10,7 +10,7 @@
       <TargetName>stm32</TargetName>
       <ToolsetNumber>0x4</ToolsetNumber>
       <ToolsetName>ARM-ADS</ToolsetName>
-      <pCCUsed>6120000::V6.12::.\ARMCLANG</pCCUsed>
+      <pCCUsed>6130001::V6.13.1::.\ARMCLANG</pCCUsed>
       <uAC6>1</uAC6>
       <TargetOption>
         <TargetCommonOption>
@@ -52,7 +52,7 @@
           <OutputName>stm32</OutputName>
           <CreateExecutable>1</CreateExecutable>
           <CreateLib>0</CreateLib>
-          <CreateHexFile>1</CreateHexFile>
+          <CreateHexFile>0</CreateHexFile>
           <DebugInformation>1</DebugInformation>
           <BrowseInformation>1</BrowseInformation>
           <ListingPath></ListingPath>
@@ -312,7 +312,7 @@
           </ArmAdsMisc>
           <Cads>
             <interw>1</interw>
-            <Optim>7</Optim>
+            <Optim>2</Optim>
             <oTime>0</oTime>
             <SplitLS>0</SplitLS>
             <OneElfS>1</OneElfS>
@@ -426,6 +426,11 @@
               <FileName>utils_ex.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\utl\src\utils_ex.c</FilePath>
+            </File>
+            <File>
+              <FileName>lpf_2p.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\utl\src\lpf_2p.c</FilePath>
             </File>
           </Files>
         </Group>
