@@ -7,4 +7,4 @@ The controling parameter should be tunned for better stabilizing.</br></br>
 ![pcb_2](/img/pcb_2.jpg)
 
 remote add
-
+remote add2
