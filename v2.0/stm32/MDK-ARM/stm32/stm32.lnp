@@ -8,6 +8,7 @@
 "stm32\utils.o"
 "stm32\utils_ex.o"
 "stm32\lpf_2p.o"
+"stm32\user.o"
 "stm32\stm32f0xx_hal_adc.o"
 "stm32\stm32f0xx_hal_adc_ex.o"
 "stm32\stm32f0xx_hal_i2c.o"

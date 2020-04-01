@@ -1,5 +1,9 @@
 {
 	"files.associations": {
-		"lpf_2p.h": "c"
+		"lpf_2p.h": "c",
+		"user.h": "c",
+		"main.h": "c",
+		"stm32f0xx_hal.h": "c",
+		"stm32f0xx_hal_conf.h": "c"
 	}
 }
