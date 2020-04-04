@@ -65,6 +65,9 @@ void mag_crtl_speed(void);
 void mag_crtl_pos(void);
 void led_process(void);
 void mag_led_reflesh(void);
+void bsp_aw9523b_reg_read(uint8_t reg, uint8_t *buffer, uint8_t size);
+void bsp_aw9523b_reg_write(uint8_t reg, uint8_t *buffer, uint8_t size);
+bool mag_btn_even(void);
 
 typedef enum
 {
@@ -125,7 +128,7 @@ void mag_set_pwm(int32_t pwm_a, int32_t pwm_b)
 		ccr2 = arr;
 	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, ccr2);
 }
-
+ 
 // 1K (Flat Response 23kHz)
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
