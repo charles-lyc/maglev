@@ -38,7 +38,7 @@ void Maglev::adc_sample_callback(void)
 	{
 		// adc noise: 10(in 4086)
 		// hall pos noise: 10(in 4086)
-		// speed noise: 10(, )
+		// speed noise: 10()
 
 		for (size_t i = 0; i < 2; i++)
 		{
@@ -58,6 +58,9 @@ void Maglev::adc_sample_callback(void)
 			_hall_spd2[i] = _filter_spd2[i].apply(tmp);
 		}
 	}
+	
+	_hall_raw[2] = _adc_raw[2] - _hall_offset[2];
+	_hall_pos[2] = _filter_pos[2].apply(_hall_raw[2]);
 
 	if (_maglev_status == MODE_RUN)
 	{
@@ -82,8 +85,7 @@ void Maglev::main_loop(void)
 	if (_maglev_status == MODE_STARTUP)
 		return;
 
-	//_drv_en(_detect());
-	_drv_en(true);
+	_drv_en(_detect());
 }
 
 void Maglev::calibrate(void)
@@ -111,5 +113,8 @@ bool Maglev::_detect(void)
 	if (_maglev_status == MODE_STARTUP)
 		return false;
 
-	return false;
+	if (_hall_pos[2] > 100)
+		return true;
+	else
+		return false;
 }

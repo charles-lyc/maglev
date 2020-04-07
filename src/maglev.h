@@ -25,24 +25,24 @@ private:
 
 	bool _invert[2];
 	uint16_t *_adc_raw;
-	float _hall_offset[2];
-	float _hall_raw[2];
-	float _hall_pos[2];
+	float _hall_offset[3];
+	float _hall_raw[3];
+	float _hall_pos[3];
 	float _hall_pos2[2];
 	float _hall_spd[2];
 	float _hall_spd2[2];
 
 	DifferentialFloat _diffential[2];
 
-	LowpassFilterFloat _filter_pos[2]{{0.2}, {0.2}};
+	LowpassFilterFloat _filter_pos[3]{{0.2}, {0.2}, {0.08}};
 	LowpassFilterFloat _filter_spd[2]{{0.6}, {0.6}};
 	LowpassFilterFloat _filter_votage[2]{{0.2}, {0.2}};
 
 	SlideFilterFloat _filter_pos2[2]{{8}, {8}};
 	LowPassFilter2p _filter_spd2[2]{{1000, 50}, {1000, 50}};
 
-	PID _pid_pos[2]{{0, 0, 0, 0, 0, 0, 1}, {0, 0, 0, 0, 0, 0, 1}};
-	PID _pid_spd[2]{{0, 0, 0, 0, 0, 0, 1}, {0, 0, 0, 0, 0, 0, 1}};
+	PID _pid_pos[2]{{1, 0, 0, 10, 1, 100, 1}, {1, 0, 0, 10, 1, 100, 1}};
+	PID _pid_spd[2]{{0, 0, 0, 1, 10, 10, 1}, {0, 0, 0, 1, 10, 10, 1}};
 
 	bool _detect(void);
 	void (*_drv_en)(bool);
