@@ -12,8 +12,8 @@ PID::PID(
 	float kp,
 	float ki,
 	float kd,
-	float int_limit,
 	float out_factor,
+	float int_limit,
 	float out_limit,
 	float dt)
 {

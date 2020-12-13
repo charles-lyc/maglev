@@ -18,6 +18,7 @@ void Maglev::init(
 	_drv_en = drv_en;
 	_motor_write = motor_write;
 	_adc_raw = raw;
+	_hall_offset[2] = 0;
 
 	_drv_en(false);
 	_maglev_status = MODE_READY;
@@ -74,9 +75,12 @@ void Maglev::adc_sample_callback(void)
 			votage[i] = _filter_votage[i].apply(out_pos + out_spd);
 
 		}
-		votage[0] = votage[1] = 1000;
 
 		_motor_write(votage[0], votage[1]);
+	}
+	else
+	{
+		_motor_write(0, 0);
 	}
 }
 
@@ -98,23 +102,32 @@ void Maglev::calibrate(void)
 
 	for (size_t i = 0; i < 2; i++)
 		_hall_offset[i] = 0;
-
+	
 	while (tick + 100 > _tick)
 		;
 
 	for (size_t i = 0; i < 2; i++)
 		_hall_offset[i] = _hall_pos[i];
+	if (_hall_offset[2] == 0)
+		_hall_offset[2] = _hall_pos[2];
 
 	_maglev_status = MODE_RUN;
 }
 
 bool Maglev::_detect(void)
 {
-	if (_maglev_status == MODE_STARTUP)
+	if (_maglev_status == MODE_STARTUP || 
+		_maglev_status == MODE_CALIBRATE)
 		return false;
 
-	if (_hall_pos[2] > 100)
+	if (_hall_pos[2] < -200)
+	{
+		_maglev_status = MODE_RUN;
 		return true;
+	}
 	else
+	{
+		_maglev_status = MODE_READY;
 		return false;
+	}
 }

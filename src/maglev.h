@@ -28,7 +28,7 @@ private:
 	float _hall_offset[3];
 	float _hall_raw[3];
 	float _hall_pos[3];
-	float _hall_pos2[2];
+	float _hall_pos2[3];
 	float _hall_spd[2];
 	float _hall_spd2[2];
 
@@ -36,13 +36,13 @@ private:
 
 	LowpassFilterFloat _filter_pos[3]{{0.2}, {0.2}, {0.08}};
 	LowpassFilterFloat _filter_spd[2]{{0.6}, {0.6}};
-	LowpassFilterFloat _filter_votage[2]{{0.2}, {0.2}};
+	LowpassFilterFloat _filter_votage[2]{{0.4}, {0.4}};
 
 	SlideFilterFloat _filter_pos2[2]{{8}, {8}};
 	LowPassFilter2p _filter_spd2[2]{{1000, 50}, {1000, 50}};
 
-	PID _pid_pos[2]{{1, 0, 0, 10, 1, 100, 1}, {1, 0, 0, 10, 1, 100, 1}};
-	PID _pid_spd[2]{{0, 0, 0, 1, 10, 10, 1}, {0, 0, 0, 1, 10, 10, 1}};
+	PID _pid_pos[2]{{2, 0, 0, 1, 1, 800, 0.001}, {2, 0, 0, 1, 1, 800, 0.001}};
+	PID _pid_spd[2]{{2, 0, 0, 10, 1, 800, 0.001}, {2, 0, 0, 10, 1, 800, 0.001}};
 
 	bool _detect(void);
 	void (*_drv_en)(bool);

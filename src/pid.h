@@ -12,8 +12,8 @@ private:
 	float _kp;
 	float _ki;
 	float _kd;
-	float _int_limit;
 	float _out_factor;
+	float _int_limit;
 	float _out_limit;
 
 	float _error;
@@ -28,8 +28,8 @@ public:
 		float kp,
 		float ki,
 		float kd,
-		float int_limit,
 		float out_factor,
+		float int_limit,
 		float out_limit,
 		float dt);
 	float apply(float error);

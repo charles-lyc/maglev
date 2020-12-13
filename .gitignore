@@ -11,6 +11,10 @@
 *.d
 *.i
 *.crf
+*uvguix.Charles
+*.dep
+*.inp
+*.htm
 
 # Object files
 *.o

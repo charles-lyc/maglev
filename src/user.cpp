@@ -34,7 +34,7 @@ void user_loop(void)
 
 		maglev.main_loop();
 
-		HAL_Delay(10);
+		HAL_Delay(1);
 	}
 }
 
@@ -50,42 +50,42 @@ void drv_en(bool en)
 	}
 }
 
-void motor_write(float a, float b)
+void motor_write(float pwm_a, float pwm_b)
 {
 	uint16_t ccr1, ccr2, arr;
 
-	if (a > 0)
-	{
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
-		ccr1 = a;
-	}
-	else
-	{
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
-		ccr1 = -a;
-	}
-	if (b > 0)
-	{
-		HAL_GPIO_WritePin(GPIOF, GPIO_PIN_0, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOF, GPIO_PIN_1, GPIO_PIN_SET);
-		ccr2 = b;
-	}
-	else
+	if (pwm_a > 0)
 	{
 		HAL_GPIO_WritePin(GPIOF, GPIO_PIN_0, GPIO_PIN_SET);
 		HAL_GPIO_WritePin(GPIOF, GPIO_PIN_1, GPIO_PIN_RESET);
-		ccr2 = -b;
+		ccr2 = pwm_a;
+	}
+	else
+	{
+		HAL_GPIO_WritePin(GPIOF, GPIO_PIN_0, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOF, GPIO_PIN_1, GPIO_PIN_SET);
+		ccr2 = -pwm_a;
+	}
+	if (pwm_b > 0)
+	{
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+		ccr1 = pwm_b;
+	}
+	else
+	{
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+		ccr1 = -pwm_b;
 	}
 
 	arr = __HAL_TIM_GET_AUTORELOAD(&htim3) - 1;
 	if (ccr1 > arr)
 		ccr1 = arr;
-	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, ccr1);
+	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, ccr1);
 	if (ccr2 > arr)
 		ccr2 = arr;
-	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, ccr2);
+	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, ccr2);
 }
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
@@ -97,7 +97,7 @@ bool mag_btn_even(void)
 {
 	if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1) == GPIO_PIN_RESET)
 	{
-		if (btn_cnt++ == 50)
+		if (btn_cnt++ == 100)
 		{
 			return true;
 		}
