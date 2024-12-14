@@ -3,7 +3,6 @@
 ## introduce
 This is just another magnetic leviation.  
 
-![pcb_1](/img/pcb_1.jpg)
 ![pcb_2](/img/pcb_2.jpg)
 </br></br>
 
