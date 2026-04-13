@@ -7,7 +7,7 @@ Maglev::Maglev()
 }
 
 void Maglev::init(
-	uint16_t raw[3],
+	volatile uint16_t raw[3],
 	bool invert_a,
 	bool invert_b,
 	void (*drv_en)(bool),
@@ -103,7 +103,7 @@ void Maglev::calibrate(void)
 	for (size_t i = 0; i < 2; i++)
 		_hall_offset[i] = 0;
 	
-	while (tick + 100 > _tick)
+	while ((_tick - tick) < 100)
 		;
 
 	for (size_t i = 0; i < 2; i++)

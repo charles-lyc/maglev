@@ -5,18 +5,26 @@ SlideFilter<T>::SlideFilter(uint16_t size)
 {
 	_size = size;
 	_buffer = (T*)malloc(sizeof(T) * _size);
+	if (_buffer == NULL) {
+		_size = 0;
+		return;
+	}
 	reset();
 }
 
 template <class T>
 SlideFilter<T>::~SlideFilter()
 {
-	free(_buffer);
+	if (_buffer != NULL)
+		free(_buffer);
 }
 
 template <class T>
 T SlideFilter<T>::apply(const T sample)
 {
+	if (_buffer == NULL || _size == 0)
+		return sample;
+
 	T sum = 0;
 
 	_indx++;
@@ -32,7 +40,8 @@ T SlideFilter<T>::apply(const T sample)
 template <class T>
 void SlideFilter<T>::reset(void)
 {
-	memset(_buffer, 0, sizeof(T) * _size);
+	if (_buffer != NULL && _size > 0)
+		memset(_buffer, 0, sizeof(T) * _size);
 }
 
 template class SlideFilter<int>;
