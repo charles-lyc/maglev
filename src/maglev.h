@@ -24,7 +24,7 @@ private:
 	volatile uint32_t _tick;
 
 	bool _invert[2];
-	uint16_t *_adc_raw;
+	volatile uint16_t *_adc_raw;
 	float _hall_offset[3];
 	float _hall_raw[3];
 	float _hall_pos[3];
@@ -51,7 +51,7 @@ private:
 public:
 	Maglev();
 
-	void init(uint16_t raw[3],
+	void init(volatile uint16_t raw[3],
 			  bool invert_a,
 			  bool invert_b,
 			  void (*drv_en)(bool),

@@ -54,37 +54,41 @@ void motor_write(float pwm_a, float pwm_b)
 {
 	uint16_t ccr1, ccr2, arr;
 
+	float abs_a = fabsf(pwm_a);
+	float abs_b = fabsf(pwm_b);
+
+	arr = __HAL_TIM_GET_AUTORELOAD(&htim3) - 1;
+
+	if (abs_a > arr)
+		abs_a = arr;
+	if (abs_b > arr)
+		abs_b = arr;
+
 	if (pwm_a > 0)
 	{
 		HAL_GPIO_WritePin(GPIOF, GPIO_PIN_0, GPIO_PIN_SET);
 		HAL_GPIO_WritePin(GPIOF, GPIO_PIN_1, GPIO_PIN_RESET);
-		ccr2 = pwm_a;
 	}
 	else
 	{
 		HAL_GPIO_WritePin(GPIOF, GPIO_PIN_0, GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(GPIOF, GPIO_PIN_1, GPIO_PIN_SET);
-		ccr2 = -pwm_a;
 	}
+	ccr2 = (uint16_t)abs_a;
+
 	if (pwm_b > 0)
 	{
 		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
-		ccr1 = pwm_b;
 	}
 	else
 	{
 		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);
 		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
-		ccr1 = -pwm_b;
 	}
+	ccr1 = (uint16_t)abs_b;
 
-	arr = __HAL_TIM_GET_AUTORELOAD(&htim3) - 1;
-	if (ccr1 > arr)
-		ccr1 = arr;
 	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, ccr1);
-	if (ccr2 > arr)
-		ccr2 = arr;
 	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, ccr2);
 }
 
